@@ -2,6 +2,46 @@
 
 All crates share the workspace version. See [the versioning policy](docs/versioning.md).
 
+## v1.1.1
+
+- **Release Notes:** [GitHub Release v1.1.1](https://github.com/ussoewwin/craft-libs/releases/tag/v1.1.1)
+
+### 2026-11-27 - `main` at `c0977ad61`, the Picker's Sample Text, and a Printer Off the Call Stack
+
+- **Merged `storytold/craft-libs` into the fork's `main`:** `main` at `c0977ad61`, 255 commits over
+  `9524262a8`, merged as `32463d74a` - one file conflicted, and `git rev-list --count
+  HEAD..upstream/main` is 0 after it. Upstream retired its `next` line in the same period (`next` at
+  `a46af76c7` is an ancestor of `9524262a8`), so the fork's own branch is `main` too and every pin
+  follows it.
+- **The picker keeps both sample texts.** Upstream moved `SampleText` into the picker's parent module
+  with a key and a label, so a host can list its sample texts by name; the fork's own `SampleText`
+  said whether the picker chose the sample. The merge keeps upstream's type and carries the flag
+  beside it as a small `RowText<'_>`, so a face that draws kana still gets the kana sample, a host's
+  own preview text is still kept in every row, and both functions stay at the seven arguments the
+  workspace's clippy setting allows.
+- **The design lint's six new findings are registered where they belong.** A host's handle side and a
+  preferences window's opening size are sizes in points by design (a theme token is the default,
+  the user's resize replaces the window's), a save-for-web focus recovery asks what arrived in this
+  pass rather than what a key means, a selection layer reports its own click beside the text it
+  paints, and `CheckContext` takes `#[non_exhaustive]` as the rule asks. Five exceptions carry a
+  marker with its reason in the code and an entry in `design/exceptions`; the lint reports 28 passed.
+- **A chain of formulas is printed without recursion.** `craft-xlsx`'s long-chain trial aborted with
+  `0xC00000FD` on its 256 KiB thread: `xlsb::expr::write_expr` held one frame per nesting level, and a
+  chain of thousands of `&` operands is thousands of levels. The printer now walks an explicit stack
+  of nodes, operator text and single characters, so a formula's depth costs heap, not call stack.
+- **The 8-bit RGBA oracle reads the format FFmpeg decodes consistently.** Encoding one 8-bit RGBA
+  frame and decoding it back with the same FFmpeg binary leaves 2,073 of 4,608 alpha samples one
+  level apart between FFmpeg's `bgra`/`rgba` output and its `gbrap` output, and FFmpeg 7.1's ffv1
+  encoder lists no 8-bit `gbrap`. That one case now asks for `rgba` and compares its interleaved
+  bytes; the other cases keep the planar comparison.
+- **The round is written down.** `md/2026-11-27-round-3-merge.md` and
+  `md/2026-11-27-round-4-merge.md` hold both merges of this release with their measurements, and
+  section 8 of `md/fork-technical-specification.md` states the third round's rules and numbers.
+- **Suites**: the workspace runs **19,689 tests, 19,689 passed, 66 skipped**; the fork's twelve crates
+  run 3,394 and pass; `craft-xlsx` 110 passed; the FFV1 trial 18 passed; format, clippy and the
+  design lint exit 0, 0 and 28 passed.
+- See [Release Notes v1.1.1](https://github.com/ussoewwin/craft-libs/releases/tag/v1.1.1) for details.
+
 ## v1.1.0
 
 - **Release Notes:** [GitHub Release v1.1.0](https://github.com/ussoewwin/craft-libs/releases/tag/v1.1.0)
