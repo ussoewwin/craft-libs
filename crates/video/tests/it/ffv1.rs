@@ -162,6 +162,25 @@ fn ffmpeg_run(ff: &Path, args: &[&str]) -> Vec<u8> {
     out.stdout
 }
 
+/// The frame's planes interleaved pixel by pixel, R, G, B (then alpha): `rgba`'s order, which is our
+/// planes' order. FFmpeg's own 8-bit RGBA FFV1 round trip decodes its `gbrap` output with the alpha
+/// sample one step off in 2,073 of these 4,608 pixels while its `bgra` and `rgba` outputs agree with
+/// each other, so the 8-bit alpha case reads `rgba` rather than the planar `gbrap`.
+fn raw_bytes_interleaved(f: &Frame) -> Vec<u8> {
+    let n = f.planes[0].len();
+    let mut out = Vec::with_capacity(n * f.planes.len());
+    for i in 0..n {
+        for p in &f.planes {
+            if f.bit_depth == 8 {
+                out.push(p[i] as u8);
+            } else {
+                out.extend_from_slice(&p[i].to_le_bytes());
+            }
+        }
+    }
+    out
+}
+
 fn raw_bytes(f: &Frame) -> Vec<u8> {
     let mut out = Vec::new();
     for p in &f.planes {
@@ -225,13 +244,20 @@ fn ffmpeg_decodes_our_packets_to_our_pixels() {
             let avi = avi_with(&f, &enc.config_record(), &enc.encode(&f).expect("encode"));
             let path = dir.join(format!("ours_{pix_fmt}_{slices_h}x{slices_v}.avi"));
             std::fs::write(&path, avi).expect("write");
-            let theirs = ffmpeg_run(&ff, &["-i", path.to_str().expect("path"), "-f", "rawvideo", "-pix_fmt", pix_fmt, "-"]);
+            // FFmpeg has no 8-bit planar `gbrap` encoder, and its own 8-bit RGBA FFV1 round trip decodes
+            // to `gbrap` with the alpha sample one step off (2,073 of 4,608 pixels differ from its own
+            // `bgra`/`rgba` output, measured). That case therefore asks for `rgba`, the packed order our
+            // planes already are; every other case asks for the planar format it names.
+            let packed_alpha = f.bit_depth == 8 && pix_fmt == "gbrap";
+            let ask = if packed_alpha { "rgba" } else { pix_fmt };
+            let theirs = ffmpeg_run(&ff, &["-i", path.to_str().expect("path"), "-f", "rawvideo", "-pix_fmt", ask, "-"]);
             // gbrp is planar G, B, R; our RGB planes are R, G, B.
             let mut want = f.clone();
-            if cs == Colorspace::Rgb {
+            if cs == Colorspace::Rgb && !packed_alpha {
                 want.planes = gbr_order(&f.planes);
             }
-            assert!(theirs == raw_bytes(&want), "{pix_fmt} {slices_h}x{slices_v}: ffmpeg's pixels differ from ours");
+            let expected = if packed_alpha { raw_bytes_interleaved(&f) } else { raw_bytes(&want) };
+            assert!(theirs == expected, "{ask} {slices_h}x{slices_v}: ffmpeg's pixels differ from ours");
         }
     }
 }

@@ -299,15 +299,6 @@ pub(crate) fn print(e: &Expr) -> String {
     }
 }
 
-fn write_args(s: &mut String, args: &[Expr], sep: char) {
-    for (i, a) in args.iter().enumerate() {
-        if i > 0 {
-            s.push(sep);
-        }
-        write_expr(s, a);
-    }
-}
-
 /// A function's name; a sheet-scoped one (`My Sheet!Fn`) is quoted as a sheet-qualified name is.
 /// Kept out of [`write_expr`], whose frame every nesting level of a formula repeats.
 #[inline(never)]
@@ -322,71 +313,110 @@ fn push_function_name(s: &mut String, name: &str) {
     }
 }
 
+/// One step of the printer's own stack: a node still to print, or the text a finished node leaves
+/// between its children. An explicit stack keeps a formula's depth off the call stack: a chain of
+/// thousands of `&` operands is thousands of levels deep, and the 256 KiB a trial gives the thread
+/// cannot hold that many frames.
+enum Step<'a> {
+    Node(&'a Expr),
+    Text(&'a str),
+    Char(char),
+    FunctionName(&'a str),
+}
+
 fn write_expr(s: &mut String, e: &Expr) {
-    match e {
-        Expr::Number(n) => s.push_str(&number(*n)),
-        Expr::Text(t) => {
-            s.push('"');
-            s.push_str(&t.replace('"', "\"\""));
-            s.push('"');
-        }
-        Expr::Bool(b) => s.push_str(if *b { "TRUE" } else { "FALSE" }),
-        Expr::Error(err) => s.push_str(err.as_str()),
-        Expr::Array(rows) => {
-            s.push('{');
-            for (ri, row) in rows.iter().enumerate() {
-                if ri > 0 {
-                    s.push(';');
+    let mut steps = vec![Step::Node(e)];
+    while let Some(step) = steps.pop() {
+        let e = match step {
+            Step::Text(t) => {
+                s.push_str(t);
+                continue;
+            }
+            Step::Char(c) => {
+                s.push(c);
+                continue;
+            }
+            Step::FunctionName(name) => {
+                push_function_name(s, name);
+                continue;
+            }
+            Step::Node(e) => e,
+        };
+        match e {
+            Expr::Number(n) => s.push_str(&number(*n)),
+            Expr::Text(t) => {
+                s.push('"');
+                s.push_str(&t.replace('"', "\"\""));
+                s.push('"');
+            }
+            Expr::Bool(b) => s.push_str(if *b { "TRUE" } else { "FALSE" }),
+            Expr::Error(err) => s.push_str(err.as_str()),
+            Expr::Array(rows) => {
+                s.push('{');
+                steps.push(Step::Char('}'));
+                for (ri, row) in rows.iter().enumerate().rev() {
+                    for (ci, a) in row.iter().enumerate().rev() {
+                        steps.push(Step::Node(a));
+                        if ci > 0 {
+                            steps.push(Step::Char(','));
+                        }
+                    }
+                    if ri > 0 {
+                        steps.push(Step::Char(';'));
+                    }
                 }
-                write_args(s, row, ',');
             }
-            s.push('}');
-        }
-        Expr::Ref(r) => push_reference(s, r),
-        Expr::Verbatim(t) => s.push_str(t),
-        Expr::Name(n) => match sheet_split(n) {
-            // A sheet-qualified name holds the bare sheet name (`My Sheet!Total`): quote it so it parses back.
-            Some((sheet, name)) => {
-                s.push_str(&quote_sheet(sheet));
-                s.push('!');
-                s.push_str(name);
+            Expr::Ref(r) => push_reference(s, r),
+            Expr::Verbatim(t) => s.push_str(t),
+            Expr::Name(n) => match sheet_split(n) {
+                // A sheet-qualified name holds the bare sheet name (`My Sheet!Total`): quote it so it parses back.
+                Some((sheet, name)) => {
+                    s.push_str(&quote_sheet(sheet));
+                    s.push('!');
+                    s.push_str(name);
+                }
+                None => s.push_str(n),
+            },
+            Expr::Structured(t) => s.push_str(t),
+            Expr::Unary(UnOp::Neg, x) => {
+                s.push('-');
+                steps.push(Step::Node(x));
             }
-            None => s.push_str(n),
-        },
-        Expr::Structured(t) => s.push_str(t),
-        Expr::Unary(UnOp::Neg, x) => {
-            s.push('-');
-            write_expr(s, x);
-        }
-        Expr::Unary(UnOp::Plus, x) => {
-            s.push('+');
-            write_expr(s, x);
-        }
-        Expr::Unary(UnOp::Percent, x) => {
-            write_expr(s, x);
-            s.push('%');
-        }
-        Expr::Binary(op, a, b) => {
-            write_expr(s, a);
-            s.push_str(op.symbol());
-            write_expr(s, b);
-        }
-        Expr::Call(name, args) => {
-            push_function_name(s, name);
-            s.push('(');
-            write_args(s, args, ',');
-            s.push(')');
-        }
-        Expr::Missing => {}
-        Expr::Paren(x) => {
-            s.push('(');
-            write_expr(s, x);
-            s.push(')');
-        }
-        Expr::Spaced(before, x, after) => {
-            s.push_str(before);
-            write_expr(s, x);
-            s.push_str(after);
+            Expr::Unary(UnOp::Plus, x) => {
+                s.push('+');
+                steps.push(Step::Node(x));
+            }
+            Expr::Unary(UnOp::Percent, x) => {
+                steps.push(Step::Char('%'));
+                steps.push(Step::Node(x));
+            }
+            Expr::Binary(op, a, b) => {
+                steps.push(Step::Node(b));
+                steps.push(Step::Text(op.symbol()));
+                steps.push(Step::Node(a));
+            }
+            Expr::Call(name, args) => {
+                steps.push(Step::Char(')'));
+                for (i, a) in args.iter().enumerate().rev() {
+                    steps.push(Step::Node(a));
+                    if i > 0 {
+                        steps.push(Step::Char(','));
+                    }
+                }
+                steps.push(Step::Char('('));
+                steps.push(Step::FunctionName(name));
+            }
+            Expr::Missing => {}
+            Expr::Paren(x) => {
+                steps.push(Step::Char(')'));
+                steps.push(Step::Node(x));
+                steps.push(Step::Char('('));
+            }
+            Expr::Spaced(before, x, after) => {
+                steps.push(Step::Text(after));
+                steps.push(Step::Node(x));
+                steps.push(Step::Text(before));
+            }
         }
     }
 }
