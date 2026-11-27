@@ -3,6 +3,9 @@
 ## What was merged
 
 `next` took 13 upstream commits over `ea14416aa`, up to `a46af76c7`, as merge commit `b3e81eb46`.
+Upstream retired `next` later the same day - PR #3644 merged it into `main`, PR #3645 retired its CI,
+and the branch was deleted at 03:40:45Z - so this fork's branch was renamed `next` to `main` too, with
+its links and the framework pins checked against the one line that remains.
 No file conflicted. Against the merge base, 0 of 9 upstream files and 0 of 52 fork files were dropped,
 and every file both sides touched keeps the lines both added.
 
