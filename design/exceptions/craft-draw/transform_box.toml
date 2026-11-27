@@ -1,9 +1,0 @@
-config_version = 1
-
-[[exception]]
-name = "transform-box-handle-side"
-kind = "marker"
-rule = "props/point-size"
-path = "crates/draw/src/ui/transform/transform_box.rs"
-reason = "A host's own handle side, in points, overrides the theme's `size.handle.md`; the token is the default and the host's preference is data."
-count = 1

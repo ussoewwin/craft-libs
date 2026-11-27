@@ -458,8 +458,16 @@ fn prepare(core: &mut CxCore<'_>, ui: &mut Ui, decl: &TextPart, state: &mut Text
     let pointer = !scrubs || in_edit_before || (focused && !core.press.phase.is_drag());
     core.text_takes_pointer = pointer;
     let read_only = core.resolved.read_only || !enabled;
-    let ink = decl.options.ink.map_or(ink, |own| crate::style::ink_color(&crate::runtime::env::Env::of(ui).tokens, own));
-    let ink = if enabled { ink } else { crate::style::rgba_color(crate::runtime::env::Env::of(ui).tokens.color.text.disabled) };
+    // The tokens of the place the field is shown in, read only for an ink of its own or a disabled field.
+    let place = (decl.options.ink.is_some() || !enabled).then(|| crate::runtime::env::Env::of(ui));
+    let ink = match (decl.options.ink, &place) {
+        (Some(own), Some(place)) => crate::style::ink_color(&place.tokens, own),
+        _ => ink,
+    };
+    let ink = match &place {
+        Some(place) if !enabled => crate::style::rgba_color(place.tokens.color.text.disabled),
+        _ => ink,
+    };
     let held = core.popup(EDIT_MENU).is_open_in(core);
     // The text the part shows now: its resting text while it is idle and has one, else the value's own.
     let current = decl.options.resting.as_deref().filter(|_| !focused && !held && state.draft.is_none()).unwrap_or(&decl.shown);
@@ -682,12 +690,6 @@ pub(crate) fn run<C: Component>(
 }
 
 impl<C: Component> Cx<'_, C> {
-    /// The response of a declared selection part after `paint` shows it, or `None` when the part has no widget.
-    pub fn selection_response(&self, part: impl Into<PartRef>) -> Option<egui::Response> {
-        let part = part.into();
-        self.core.selections.contains(&part).then(|| self.core.ctx.read_response(selection_id(self.core.id, part))).flatten()
-    }
-
     /// Changes the text part's draft in the next pass: `Some(text)` puts `text` in as a change of the typing run (one
     /// that begins the run when none is under way), the caret at its end; `None` ends the run with the text from
     /// before it, without the run's Escape reaching the host. A combo box's keys in its open list put the active

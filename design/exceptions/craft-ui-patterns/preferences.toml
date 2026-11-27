@@ -1,9 +1,0 @@
-config_version = 1
-
-[[exception]]
-name = "preferences-window-opening-size"
-kind = "marker"
-rule = "props/point-size"
-path = "crates/ui-patterns/src/patterns/preferences/window.rs"
-reason = "The size the window opens at: the layout's own default, replaced by the user's resize."
-count = 1

@@ -1,9 +1,1 @@
 config_version = 1
-
-[[exception]]
-name = "selectable-text-selection-click"
-kind = "marker"
-rule = "contract/pointer"
-path = "crates/ui-widgets/src/text/selectable_text.rs"
-reason = "A selection layer reports its click beside the text it paints; the response it returns carries that state."
-count = 1
