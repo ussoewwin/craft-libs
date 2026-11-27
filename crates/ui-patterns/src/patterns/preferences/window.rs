@@ -117,6 +117,7 @@ pub struct PreferencesWindow<'a> {
     /// pages, a narrower one for cards). A size under the layout's least ([`MIN_SIZE`] for pages) opens at the least;
     /// a size that is not finite is ignored.
     #[prop]
+    // design: allow[props/point-size](the size the window opens at: the layout's own default, replaced by the user's resize)
     size: Option<Vec2>,
     /// Escape keeps the typing in the focused field ([`Dialog::escape_keeps_typing`]): in [`PreferencesMode::Live`]
     /// the typed value stays applied when Escape closes the window. Off by default: Escape cancels the typing.

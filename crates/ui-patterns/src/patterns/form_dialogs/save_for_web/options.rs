@@ -454,7 +454,9 @@ fn color_table_section(ui: &mut Ui, kit: &Kit<'_>, live: &mut Live, asked: &mut 
             if interactive {
                 let mut recover = focused_action.is_some_and(|index| targets[index].is_none());
                 // Recover on the following frame so presses can finish choosing their own focus.
+                // design: allow[contract/egui-import](focus recovery tells a lost focus from a chosen one once per pass; the contract's memory helpers hold its own map, not egui's focus id)
                 if live.recover_table_focus && ui.memory(|memory| memory.focused().is_none()) {
+                    // design: allow[contract/keys](the recovery asks whether a press or a Tab arrived in this pass, not what a key means)
                     if ui.input(|input| input.pointer.any_pressed() || input.key_pressed(egui::Key::Tab)) {
                         recover = true;
                     } else {

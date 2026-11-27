@@ -1,1 +1,17 @@
 config_version = 1
+
+[[exception]]
+name = "save-for-web-focus-recovery-memory"
+kind = "marker"
+rule = "contract/egui-import"
+path = "crates/ui-patterns/src/patterns/form_dialogs/save_for_web/options.rs"
+reason = "Focus recovery tells a lost focus from a chosen one once per pass; the contract's memory helpers hold its own map, not egui's focus id."
+count = 1
+
+[[exception]]
+name = "save-for-web-focus-recovery-keys"
+kind = "marker"
+rule = "contract/keys"
+path = "crates/ui-patterns/src/patterns/form_dialogs/save_for_web/options.rs"
+reason = "The recovery asks whether a press or a Tab arrived in this pass, not what a key means."
+count = 1

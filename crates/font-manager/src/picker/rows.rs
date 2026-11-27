@@ -470,6 +470,14 @@ fn filter_chips(
     });
 }
 
+/// The text a row draws, and whether the picker chose it: a face that draws kana replaces the automatic
+/// sample, and a host's own text is kept as it is given.
+#[derive(Clone, Copy)]
+struct RowText<'a> {
+    text: &'a str,
+    auto: bool,
+}
+
 /// The sample of a family row: its text ([`row_text`]) in the regular face of `family` at `size.side × SAMPLE_EM`, in a
 /// band of the thumbnail side `size.side` as the banner's, named "{shown}: {text}" as the font manager names its
 /// samples, so the row keeps the family's name to itself; no face for a family the catalog lacks.
@@ -479,11 +487,10 @@ fn sample<'a>(
     infos: &'a FamilyInfos,
     family: &str,
     shown: &str,
-    text: &str,
-    auto: bool,
+    text: RowText<'_>,
     size: Sample,
 ) -> FontSample<'a> {
-    let text = row_text(at, catalog, infos, family, text, auto, shown);
+    let text = row_text(at, catalog, infos, family, text, shown);
     let face =
         infos.families.get(family).map_or(SampleFace::Missing, |info| SampleFace::Face { catalog, owner: Owner::Installed, face: &info.regular });
     FontSample::new(format!("{shown}: {text}"), text, face, size.side * SAMPLE_EM).band(size.side)
@@ -491,12 +498,12 @@ fn sample<'a>(
 
 /// What `family`'s sample says ([`FamilyInfos::sample_text`]) once its regular face is ready; `text` while it loads,
 /// when the sample shows nothing yet.
-fn row_text(at: &impl FacesCx, catalog: &Arc<Catalog>, infos: &FamilyInfos, family: &str, text: &str, auto: bool, shown: &str) -> String {
-    let Some(info) = infos.families.get(family) else { return text.to_owned() };
+fn row_text(at: &impl FacesCx, catalog: &Arc<Catalog>, infos: &FamilyInfos, family: &str, text: RowText<'_>, shown: &str) -> String {
+    let Some(info) = infos.families.get(family) else { return text.text.to_owned() };
     match faces::shown(at, catalog, Owner::Installed, &info.regular) {
         Shown::Ready(_) => faces::bytes(at, Owner::Installed, &info.regular)
-            .map_or_else(|| text.to_owned(), |face| infos.sample_text(family, text, shown, &face, auto)),
-        _ => text.to_owned(),
+            .map_or_else(|| text.text.to_owned(), |face| infos.sample_text(family, text.text, shown, &face, text.auto)),
+        _ => text.text.to_owned(),
     }
 }
 
@@ -650,7 +657,7 @@ pub(super) fn popup<'a>(picker: &mut FontPicker<'a>, ui: &mut OverlayUi<'_>, cx:
                 });
                 let label = words.preview_of.fill(&[("family", shown_name.as_str())]);
                 // What the family's row shows: the text, or its name or first glyphs when the face can't draw it.
-                let shown_text = row_text(faces_at, catalog, &infos, &banner_family, text, sample_auto, &shown_name);
+                let shown_text = row_text(faces_at, catalog, &infos, &banner_family, RowText { text, auto: sample_auto }, &shown_name);
                 FontPreviewBanner::new(label, &shown_name, &shown_text, face).on_white(on_white).show(ui);
             }
             if let Some(filters) = filters.as_mut() {
@@ -737,8 +744,7 @@ pub(super) fn popup<'a>(picker: &mut FontPicker<'a>, ui: &mut OverlayUi<'_>, cx:
                                     &infos,
                                     &row.family,
                                     &row.shown,
-                                    sample_text,
-                                    sample_auto,
+                                    RowText { text: sample_text, auto: sample_auto },
                                     sample_size,
                                 )
                                 .on_white(on_white);
