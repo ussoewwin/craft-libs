@@ -1,6 +1,6 @@
 //! Building `TextEdit` and its state: the one caller of egui's text editing.
 
-use crate::primitives::{COLORED_TEXT_LIMIT, ColorRange, ColorRanges, RangeInk};
+use crate::runtime::egui::text_ink::{COLORED_TEXT_LIMIT, ColorRange, ColorRanges, RangeInk};
 use crate::runtime::env::Env;
 use craft_theme::TypeRole;
 use egui::text::{CCursor, CCursorRange, LayoutJob, TextFormat};

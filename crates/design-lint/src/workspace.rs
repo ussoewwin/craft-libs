@@ -84,6 +84,7 @@ const CLOSED: &[&str] = &[
     "ToastEnd",         // built or matched in craft-ui-widgets
     "TrackLook",        // built or matched in craft-ui-widgets
     "VariantParts",     // built or matched in craft-ui-widgets
+    "ColorRange",       // built in craft-develop-model with a struct expression
 ];
 
 /// Permission keys whose only allowed location is craft-ui-contract's `runtime::egui`.
