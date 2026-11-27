@@ -107,6 +107,10 @@ pub(crate) fn begin(ctx: &Context, press_captured: bool) -> EscapeRouting {
         .map(|(at, _)| at)
         .chain(batch.presses.iter().filter(|press| held_press(press)).filter_map(|press| press.text))
         .collect();
+    // The release ends a Space hold whatever holds the focus, and with no stop focused at all: the stop
+    // that took the press is the one the release activates, and leaving the hold behind would let a later,
+    // unrelated Space release activate it.
+    space_release(ctx, &batch, &mut routed, &mut activated);
     if let Some(rec) = &target {
         for (press, taken) in batch.presses.iter().zip(&mut consumed).filter(|(press, _)| !press.canvas) {
             *taken = if let Some(id) = hover_delete.filter(|id| Some(*id) != target.as_ref().map(|rec| rec.stop.id))
@@ -123,7 +127,6 @@ pub(crate) fn begin(ctx: &Context, press_captured: bool) -> EscapeRouting {
             };
             stamp(&mut routed, Source { place: press.place, shift: press.mods.shift });
         }
-        space_release(ctx, &batch, &mut routed, &mut activated);
         // The focused stop reads its typing from egui's input when it is a text field (its egui text widget) or an app's
         // own widget; any other taker reads the text as an intent only, and the text leaves egui's input.
         let reads_egui = rec.stop.host || rec.stop.keys.owner == OwnerClass::Text;
@@ -833,7 +836,13 @@ fn apply_press(
         }
         // The Space key activates on its release, as a click does: the press holds the stop, and the pass that brings
         // the release activates it once (`space_release`), even when the focus moved in between.
-        PressRoute::Space => space_held::hold(ctx, &rec.stop),
+        // An auto-repeat keeps the hold it found: the stop that took the press is the one the release
+        // activates, so a repeat must neither create a hold nor replace one with a stop focused since.
+        PressRoute::Space => {
+            if !press.repeat {
+                space_held::hold(ctx, &rec.stop);
+            }
+        }
         PressRoute::Close(layer) => overlay::request_close(ctx, layer, overlay::CloseReason::Requested),
         PressRoute::Intent(intent) => push(routed, id, intent, false),
         PressRoute::Nudge(nudge) => routed.entry(id).or_default().nudge = Some(nudge),

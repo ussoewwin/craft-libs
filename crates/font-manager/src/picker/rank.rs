@@ -160,14 +160,41 @@ fn is_private_use(c: char) -> bool {
 }
 
 /// Whether a glyph of `font` has an outline, which is all the sample painter draws: a TrueType glyph with contours, or
-/// any glyph of a CFF face. A colour bitmap face (sbix, CBDT) maps its characters to glyphs without outlines.
-fn inked<'a>(font: &FontRef<'a>) -> impl Fn(GlyphId) -> bool + 'a {
+/// a glyph of a CFF face whose CharString draws something. A colour bitmap face (sbix, CBDT) maps its characters to
+/// glyphs without outlines, and CFF and CFF2 allow an empty CharString, so a mapped character is not a drawn one.
+fn inked<'a>(font: &'a FontRef<'a>) -> impl Fn(GlyphId) -> bool + 'a {
     let truetype = font.loca(None).ok().zip(font.glyf().ok());
-    let cff = font.cff().is_ok() || font.cff2().is_ok();
+    let cff = (font.cff().is_ok() || font.cff2().is_ok()).then_some(font);
     move |glyph| match &truetype {
         Some((loca, glyf)) => loca.get_glyf(glyph, glyf).ok().flatten().is_some(),
-        None => cff,
+        None => cff.is_some_and(|font| outlines(font, glyph)),
     }
+}
+
+/// Whether `font`'s glyph emits at least one drawing command: an empty CharString of a CFF face emits none, so a
+/// face with visible Latin glyphs and mapped but empty Kana ones keeps a sample that draws.
+fn outlines(font: &FontRef<'_>, glyph: GlyphId) -> bool {
+    struct Ink(bool);
+    impl skrifa::outline::OutlinePen for Ink {
+        fn move_to(&mut self, _: f32, _: f32) {
+            self.0 = true;
+        }
+        fn line_to(&mut self, _: f32, _: f32) {
+            self.0 = true;
+        }
+        fn quad_to(&mut self, _: f32, _: f32, _: f32, _: f32) {
+            self.0 = true;
+        }
+        fn curve_to(&mut self, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32) {
+            self.0 = true;
+        }
+        fn close(&mut self) {}
+    }
+    let Some(outline) = font.outline_glyphs().get(glyph) else { return false };
+    let location = skrifa::instance::Location::default();
+    let settings = skrifa::outline::DrawSettings::unhinted(skrifa::instance::Size::unscaled(), &location);
+    let mut ink = Ink(false);
+    outline.draw(settings, &mut ink).is_ok() && ink.0
 }
 
 /// The upright face nearest weight 400.

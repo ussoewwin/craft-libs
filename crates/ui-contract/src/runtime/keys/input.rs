@@ -131,12 +131,14 @@ impl Strip<'_> {
     /// already down is a repeat, as egui reads it, whatever the platform said. `at` is the event's arrival time (`Arrival::at`).
     fn event(&self, batch: &mut Batch, alt: &mut AltTrack, consumed: &mut Vec<Key>, down: &[Key], event: KeyEvent, arrival: Arrival) -> bool {
         let at = arrival.at;
-        // A bare Space release ends a Space activation the focused stop held (`route::space_held`); the canvas's
+        // A Space release ends a Space activation the focused stop held (`route::space_held`); the canvas's
         // Space keeps its release, since that release ends its command. It waits for a press when the release comes in
-        // the pass before it, since the hook reads this pass's keys once.
+        // the pass before it, since the hook reads this pass's keys once. The modifiers down at the release do not
+        // matter: the press is what had to be bare, and a Shift pressed before the key came up must not leave the hold
+        // behind to fire on a later, unrelated Space.
         if let KeyEvent::Release { input } = &event {
             let key = input.physical.or(input.typed);
-            if key == Some(Key::Space) && !input.mods.shift && !input.mods.alt && !self.canvas_space {
+            if key == Some(Key::Space) && !self.canvas_space {
                 batch.space_release_pending = true;
             }
         }
@@ -686,7 +688,7 @@ pub(crate) fn input_hook(ctx: &Context, input: &RawInput, events: &mut Vec<Arriv
             .iter()
             .filter(|arrived| {
                 matches!(&raw_input::key_event(&arrived.event, os, latin, stage.alt.last.unwrap_or(Mods::NONE)), KeyEvent::Release { input }
-                if input.physical.or(input.typed) == Some(Key::Space) && !input.mods.shift && !input.mods.alt)
+                if input.physical.or(input.typed) == Some(Key::Space))
             })
             .count()
             > 0;

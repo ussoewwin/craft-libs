@@ -1,7 +1,7 @@
 //! Date values and the calendar maths: parsing at a precision, and moves across month and year edges.
 
 use craft_behavior::NavMove;
-use craft_i18n::{DateFormat, Weekday};
+use craft_i18n::{DateFormat, NameLength, Weekday};
 use craft_ui::buttons::Button;
 use craft_ui::contract::{Bind, Show as _, ShowContainer as _};
 use craft_ui::pickers::{CalendarPopover, CalendarView, DatePicker, DatePrecision, PickedDate};
@@ -170,6 +170,11 @@ fn today_is_centred_and_clear_waits_for_a_value() {
     let texts = fixture.texts();
     let at = |word: &str| texts.iter().find(|run| run.text == word).unwrap_or_else(|| panic!("{word} is painted")).rect.center().x;
     assert!(texts.iter().all(|run| run.text != "Clear"), "no value, no Clear");
-    let middle = (at("Su") + at("Sa")) / 2.0;
+    // The heads follow the system region (`Env::dates`), so the trial reads them from that format
+    // instead of assuming English on whatever machine runs it.
+    let dates = DateFormat::new(&craft_i18n::Region::system());
+    let sunday = dates.weekday_name(Weekday::Sunday, NameLength::Short);
+    let saturday = dates.weekday_name(Weekday::Saturday, NameLength::Short);
+    let middle = (at(&sunday) + at(&saturday)) / 2.0;
     assert!((at("Today") - middle).abs() < 6.0, "Today is centred: {} against {middle}", at("Today"));
 }

@@ -768,8 +768,12 @@ fn output_within_full(
         }
     }
     let timed_out = || std::io::Error::new(std::io::ErrorKind::TimedOut, format!("the command did not answer within {limit:?}"));
+    // One deadline for the call and for both pipes, plus a moment's grace so output written just
+    // before an exit at the deadline counts: collecting the second pipe never restarts the wait.
     let deadline = std::time::Instant::now() + limit;
-    let collect = |rx: &std::sync::mpsc::Receiver<std::io::Result<Vec<u8>>>, left: std::time::Duration| -> std::io::Result<Vec<u8>> {
+    let grace = std::time::Duration::from_millis(100);
+    let collect = |rx: &std::sync::mpsc::Receiver<std::io::Result<Vec<u8>>>| -> std::io::Result<Vec<u8>> {
+        let left = (deadline + grace).saturating_duration_since(std::time::Instant::now());
         match rx.recv_timeout(left) {
             Ok(read) => read,
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => Err(timed_out()),
@@ -779,10 +783,8 @@ fn output_within_full(
     loop {
         match child.try_wait() {
             Ok(Some(status)) => {
-                // A moment's grace, so output written just before an exit at the deadline counts.
-                let left = deadline.saturating_duration_since(std::time::Instant::now()).max(std::time::Duration::from_millis(100));
-                let out = collect(&rx, left)?;
-                let err = collect(&erx, left)?;
+                let out = collect(&rx)?;
+                let err = collect(&erx)?;
                 return Ok((out, err, status));
             }
             Ok(None) if std::time::Instant::now() >= deadline => {
