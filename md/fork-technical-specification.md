@@ -1,7 +1,7 @@
 # Craft-Libs Fork Technical Specification & Upstream Delta Guide
 
-> **Repository:** `ussoewwin/craft-libs` (Branch: `next`)  
-> **Upstream Tracking:** `storytold/craft-libs` (Branch: `next`)  
+> **Repository:** `ussoewwin/craft-libs` (Branch: `main`)  
+> **Upstream Tracking:** `storytold/craft-libs` (Branch: `main`)  
 > **Target Consumer:** PhotoCraft & Native Craft Applications  
 > **Author:** ussoewwin  
 > **Standard:** Strict Rust (Clean Room, `unsafe_code = "deny"`, Zero Panics / Zero Unwraps in Non-Test Code)  
@@ -12,7 +12,7 @@
 
 This specification provides comprehensive technical documentation for the `ussoewwin/craft-libs` fork. `craft-libs` is the shared Rust foundation powering the Craft application suite (including PhotoCraft, ArtCraft, DesignCraft, and VectorCraft).
 
-The fork maintains strict synchronization with official upstream (`storytold/craft-libs:next`) while introducing critical architectural fixes, host stability improvements, format decoder enhancements, and Photoshop 1:1 behavioral parity.
+The fork maintains strict synchronization with official upstream (`storytold/craft-libs:main`) while introducing critical architectural fixes, host stability improvements, format decoder enhancements, and Photoshop 1:1 behavioral parity.
 
 ### Active Core Fork Enhancements
 1. **Host Accessibility Crash Prevention (`craft-ui-contract`)**: Eliminates unwrap panics in Windows UI Automation (UIA) adapters triggered by transient dangling relation references in popup/menu transitions (`drop_dangling_relations`). Upstreamed via PR #2328.
@@ -377,3 +377,39 @@ and 0 of 9 upstream files and 0 of 52 fork files were dropped against the merge 
 - **The measurements.** 18,729 tests run, 18,728 passed, 63 skipped, 1 failed (upstream's `craft-xlsx`
   stack test, section 4); format and clippy exit 0.
 
+
+## 8. The third round of 2026-11-27
+
+`storytold/craft-libs` `9524262a8` — 646 commits over the fork's base — merged into `main` as
+`0a6889c09`'s parent history with no conflict, fork files kept, `behind 0`.
+
+Upstream retired the `next` line in the same period: `next` at `a46af76c7` is an ancestor of
+`9524262a8` and the branch no longer exists, so both repositories follow `main` only. The fork's
+branch was renamed from `next` to `main` at the same commit, and the specification's branch
+references follow it.
+
+- **The fork's rules on the new API.** `printers_via_checked` keeps the listing's exit status and
+  stderr inside one absolute deadline; `PressRoute::Space` holds through `space_held::hold` and
+  collects the release outside the target branch; the Space release no longer requires a modifier,
+  so releasing with Shift down cannot leave a record held; `host_words` returns to
+  `Region::system()`, and the date picker's trial reads its weekday headings from
+  `DateFormat::new(&Region::system())`; `rank.rs` counts CFF drawing commands through skrifa's
+  `OutlinePen` instead of treating an empty CharString as ink.
+- **The stale design-lint exemptions are gone.** Upstream rewrote the dialog trial the previous
+  round's exemptions named, so they covered zero sites (`exception/stale`). Both entries were
+  removed and the empty `dialog.toml` restored; the lint reports 28 passed.
+- **The 8-bit RGBA oracle reads the format FFmpeg decodes consistently.** FFmpeg's own ffv1 round
+  trip of the same 8-bit RGBA frame leaves 2,073 of 4,608 alpha samples one level apart between its
+  `bgra`/`rgba` and `gbrap` outputs; FFmpeg 7.1's ffv1 encoder lists no 8-bit `gbrap`. That one case
+  now asks for `rgba` and compares `raw_bytes_interleaved`; the other cases keep the planar compare.
+- **The formula printer left the call stack.** `xlsb::expr::write_expr` recursed once per nesting
+  level, and `a_long_chain_of_strings_stays_within_the_depth_bound` builds thousands of levels on a
+  256 KiB thread, aborting with 0xC00000FD. A staged probe over six runs put the abort after
+  `decode`, inside `print`. `write_expr` now walks an explicit stack of nodes, operator text and
+  single characters; `write_args` went with it.
+- **The measurements.** 19,445 tests run, 19,445 passed, 66 skipped (542.4 s); `craft-xlsx` 110
+  passed; the FFV1 trial 18 passed; format and clippy exit 0; design lint 28 passed. Three
+  `--all-features` failures in `craft-video` (`h264_encode::high10_oracle`,
+  `hevc_decode::conformance::bframes`, `draft_mode_changes_only_flagged_non_reference_pictures`) fail
+  identically on the tree from before this round's changes, and the release gate runs the default
+  features.
