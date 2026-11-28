@@ -2,6 +2,30 @@
 
 All crates share the workspace version. See [the versioning policy](docs/versioning.md).
 
+## v1.1.2
+
+- **Release Notes:** [GitHub Release v1.1.2](https://github.com/ussoewwin/craft-libs/releases/tag/v1.1.2)
+
+### 2026-11-28 - `main` at `51fcc3b04`, the Coloured-Text Ink at Its Own Layer
+
+- **Merged `storytold/craft-libs` into the fork's `main`:** `main` at `51fcc3b04`, 328 commits over
+  `a7ff12f4d`, merged as `02419852d` - four files conflicted and each took upstream's side, because
+  upstream had fixed in the same period what this fork registered as exemptions the round before (a
+  handle side and a preferences window's opening size as `#[prop(quantity = ...)]`, the save-for-web
+  focus recovery and the selectable text's click block deleted). `git rev-list --count
+  HEAD..upstream/main` is 0 after it.
+- **The coloured-text primitives sit at their own layer.** `runtime/egui/text_edit.rs` imported
+  `COLORED_TEXT_LIMIT`, `RangeInk`, `ColorRange` and `ColorRanges` from `primitives`, one layer above
+  it - fourteen `layer/import` findings. They now live in `runtime/egui/text_ink.rs`, `primitives`
+  re-exports them so no caller changes, and `ColorRange` joins the lint's closed list beside
+  `CheckContext`, because `craft-develop-model` builds it with a struct expression.
+- **The round is written down.** `photocraft`'s `md/2026-11-28-merge-code-01-craft-libs.md` holds every
+  hunk of the repair with the upstream lines that forced it; the set's index is
+  `md/2026-11-28-merge-code-00-index.md` in the same repository.
+- **Suites**: the workspace runs **19,885 tests, 19,885 passed, 66 skipped**; the fork's twelve crates
+  run 3,447 and pass; format and clippy exit 0, and the design lint 28 passed.
+- See [Release Notes v1.1.2](https://github.com/ussoewwin/craft-libs/releases/tag/v1.1.2) for details.
+
 ## v1.1.1
 
 - **Release Notes:** [GitHub Release v1.1.1](https://github.com/ussoewwin/craft-libs/releases/tag/v1.1.1)
